@@ -31,14 +31,18 @@ class DiscordBot:
             if message.channel.id in self.config [ 'discord_channel_ids' ]:
                 logger.info ( f"Message matches monitored channel {message.channel.id}" )
                 channel_name = message.channel.name
-                content = f"From {channel_name} ({message.author.name}): {message.content}"
+                content = f"From {channel_name} ({message.author.name}): {message.content}" if message.content else f"From {channel_name} ({message.author.name})"
 
                 if message.attachments:
                     for attachment in message.attachments:
-                        content += f"\nAttachment: {attachment.url}"
-
-                await self.message_queue.put ( content )
-                logger.info ( f"Queued message: {content}" )
+                        # Queue attachment URL separately
+                        await self.message_queue.put (
+                            { 'type': 'attachment', 'url': attachment.url, 'caption': content } )
+                        logger.info ( f"Queued attachment: {attachment.url} with caption: {content}" )
+                else:
+                    # Queue text-only message
+                    await self.message_queue.put ( { 'type': 'text', 'content': content } )
+                    logger.info ( f"Queued text message: {content}" )
 
     async def run ( self ):
         logger.info ( "Starting Discord bot" )

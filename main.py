@@ -4,19 +4,18 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import os
 import time
-from app.discord_bot import DiscordBot
-from app.telegram_bot import TelegramBot
+import aiofiles  # Add to requirements.txt
+from bot.discord_bot import DiscordBot
+from bot.telegram_bot import TelegramBot
 
-# Ensure logs directory exists
 log_dir = 'logs'
 os.makedirs(log_dir, exist_ok=True)
 
-# Configure logging with rotation
 log_handler = TimedRotatingFileHandler(
     filename=os.path.join(log_dir, 'bot.log'),
-    when='midnight',  # Rotate at midnight
-    interval=1,       # Every day
-    backupCount=2     # Keep 2 days of logs
+    when='midnight',
+    interval=1,
+    backupCount=2
 )
 logging.basicConfig(
     level=logging.INFO,
@@ -25,15 +24,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger('bot')
 
-# Load configuration
 with open('config.json', 'r') as f:
     config = json.load(f)
 
-# Shared message queue
 message_queue = asyncio.Queue()
+queue_file = os.path.join(log_dir, 'queue.json')
+
+async def load_queue():
+    """Load persisted queue on startup."""
+    if os.path.exists(queue_file):
+        async with aiofiles.open(queue_file, 'r') as f:
+            data = await f.read()
+            if data:
+                items = json.loads(data)
+                for item in items:
+                    await message_queue.put(item)
+                logger.info(f"Loaded {len(items)} items from queue")
+
+async def save_queue():
+    """Save queue to file periodically."""
+    while True:
+        items = []
+        while not message_queue.empty():
+            items.append(await message_queue.get())
+        if items:
+            async with aiofiles.open(queue_file, 'w') as f:
+                await f.write(json.dumps(items))
+            for item in items:
+                await message_queue.put(item)  # Re-queue items
+            logger.info(f"Saved {len(items)} items to queue")
+        await asyncio.sleep(60)  # Save every minute
 
 async def clean_old_logs():
-    """Delete log files older than 2 days."""
     while True:
         now = time.time()
         if os.path.exists(log_dir):
@@ -41,21 +63,20 @@ async def clean_old_logs():
                 file_path = os.path.join(log_dir, filename)
                 if os.path.isfile(file_path) and 'bot.log' in filename:
                     file_age = now - os.path.getmtime(file_path)
-                    if file_age > 2 * 24 * 60 * 60:  # 2 days in seconds
+                    if file_age > 2 * 24 * 60 * 60:
                         os.remove(file_path)
                         logger.info(f"Deleted old log file: {file_path}")
-        await asyncio.sleep(24 * 60 * 60)  # Check once a day
+        await asyncio.sleep(24 * 60 * 60)
 
 async def main():
-    # Initialize bots
     discord_bot = DiscordBot(config, message_queue)
     telegram_bot = TelegramBot(config, message_queue)
-
-    # Run both bots and cleanup concurrently
+    await load_queue()  # Load queue on startup
     await asyncio.gather(
         discord_bot.run(),
         telegram_bot.run(),
-        clean_old_logs()
+        clean_old_logs(),
+        save_queue()  # Periodically save queue
     )
 
 if __name__ == "__main__":
