@@ -5,14 +5,14 @@ from logging.handlers import TimedRotatingFileHandler
 import os
 import time
 import aiofiles  # Add to requirements.txt
-from bot.discord_bot import DiscordBot
-from bot.telegram_bot import TelegramBot
+from src.discord_bot import DiscordBot
+from src.telegram_bot import TelegramBot
 
 log_dir = 'logs'
 os.makedirs(log_dir, exist_ok=True)
 
 log_handler = TimedRotatingFileHandler(
-    filename=os.path.join(log_dir, 'bot.log'),
+    filename=os.path.join(log_dir, 'src.log'),
     when='midnight',
     interval=1,
     backupCount=2
@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[log_handler, logging.StreamHandler()]
 )
-logger = logging.getLogger('bot')
+logger = logging.getLogger('src')
 
 with open('config.json', 'r') as f:
     config = json.load(f)
@@ -61,7 +61,7 @@ async def clean_old_logs():
         if os.path.exists(log_dir):
             for filename in os.listdir(log_dir):
                 file_path = os.path.join(log_dir, filename)
-                if os.path.isfile(file_path) and 'bot.log' in filename:
+                if os.path.isfile(file_path) and 'src.log' in filename:
                     file_age = now - os.path.getmtime(file_path)
                     if file_age > 2 * 24 * 60 * 60:
                         os.remove(file_path)

@@ -3,7 +3,7 @@ from discord.ext import commands
 import asyncio
 import logging
 
-logger = logging.getLogger ( 'bot.discord' )
+logger = logging.getLogger ( 'src.discord' )
 
 
 class DiscordBot:
@@ -45,6 +45,6 @@ class DiscordBot:
                     logger.info ( f"Queued text message: {content}" )
 
     async def run ( self ):
-        logger.info ( "Starting Discord bot" )
+        logger.info ( "Starting Discord src" )
         await self.setup ()
         await self.bot.start ( self.config [ 'discord_token' ] )

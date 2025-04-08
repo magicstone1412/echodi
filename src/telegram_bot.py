@@ -4,7 +4,7 @@ import logging
 import aiohttp
 import os
 
-logger = logging.getLogger ( 'bot.telegram' )
+logger = logging.getLogger ( 'src.telegram' )
 
 
 class TelegramBot:
@@ -57,5 +57,5 @@ class TelegramBot:
                 self.message_queue.task_done ()
 
     async def run ( self ):
-        logger.info ( "Starting Telegram bot" )
+        logger.info ( "Starting Telegram src" )
         await self.send_messages ()
