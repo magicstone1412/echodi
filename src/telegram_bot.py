@@ -19,13 +19,11 @@ class TelegramBot:
             prefix, message = content.split(':', 1)
             # Convert Discord Markdown to Telegram HTML
             message = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', message)              # Bold
-            message = re.sub(r'__(.*?)__', r'<i>\1</i>', message)                  # Italic (assuming underline not intended)
+            message = re.sub(r'__(.*?)__', r'<i>\1</i>', message)                  # Italic
             message = re.sub(r'~~(.*?)~~', r'<s>\1</s>', message)                  # Strikethrough
             message = re.sub(r'\|\|(.*?)\|\|', r'<span class="tg-spoiler">\1</span>', message)  # Spoiler
             message = re.sub(r'`([^`]+)`', r'<code>\1</code>', message)            # Inline code
-            # Code block with optional language
             message = re.sub(r'```(\w+)?\n(.*?)\n```', lambda m: f'<pre><code class="language-{m.group(1)}">{m.group(2)}</code></pre>' if m.group(1) else f'<pre>{m.group(2)}</pre>', message, flags=re.DOTALL)
-            # Combine with a newline
             return f"{prefix}:\n{message.strip()}"
         return content
 
@@ -44,15 +42,20 @@ class TelegramBot:
             logger.error(f"Failed to send message: {e}")
 
     async def send_attachment(self, url, caption, session):
-        """Send an attachment to Telegram with HTML caption after converting from Discord Markdown."""
-        formatted_caption = self.format_discord_message(caption) if caption else None
+        """Send an attachment (photo, video, or document) to Telegram, or caption + hidden URL if video > 50 MB."""
+        formatted_caption = self.format_discord_message(caption) if caption else "Attachment"
         async with session.get(url) as response:
             if response.status == 200:
                 file_data = await response.read()
+                file_size = len(file_data) / (1024 * 1024)  # Size in MB
                 file_name = url.split('/')[-1].split('?')[0]
 
                 try:
                     if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                        if file_size > 10:
+                            logger.error(f"Photo too large: {file_name} ({file_size:.2f} MB) exceeds Telegram's 10 MB limit")
+                            await self.send_text_message(f"{formatted_caption}\nPhoto too large: <a href=\"{url}\">Video Link</a>")
+                            return
                         logger.info(f"Sending photo to Telegram: {file_name}")
                         await self.bot.send_photo(
                             chat_id=self.config['telegram_chat_id'],
@@ -60,7 +63,24 @@ class TelegramBot:
                             caption=formatted_caption,
                             parse_mode=telegram.constants.ParseMode.HTML
                         )
+                    elif file_name.lower().endswith(('.mp4', '.mov', '.avi')):  # Video files
+                        if file_size > 50:
+                            logger.info(f"Video too large ({file_size:.2f} MB), sending caption and hidden URL: {file_name}")
+                            await self.send_text_message(f"{formatted_caption}\nVideo: <a href=\"{url}\">Video Link</a>")
+                            return
+                        logger.info(f"Sending video to Telegram: {file_name}")
+                        await self.bot.send_video(
+                            chat_id=self.config['telegram_chat_id'],
+                            video=file_data,
+                            filename=file_name,
+                            caption=formatted_caption,
+                            parse_mode=telegram.constants.ParseMode.HTML
+                        )
                     else:
+                        if file_size > 50:
+                            logger.error(f"Document too large: {file_name} ({file_size:.2f} MB) exceeds Telegram's 50 MB limit")
+                            await self.send_text_message(f"{formatted_caption}\nDocument too large: <a href=\"{url}\">Video Link</a>")
+                            return
                         logger.info(f"Sending document to Telegram: {file_name}")
                         await self.bot.send_document(
                             chat_id=self.config['telegram_chat_id'],
