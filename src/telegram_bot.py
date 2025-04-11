@@ -11,7 +11,7 @@ class TelegramBot:
     def __init__(self, config, message_queue):
         self.config = config
         self.message_queue = message_queue
-        self.bot = telegram.Bot(token=config['telegram_token'])
+        self.bot = telegram.Bot(token=config['telegram']['token'])
 
     def _split_message_by_colon(self, content):
         """Split message by the first colon and return prefix and message."""
@@ -52,7 +52,7 @@ class TelegramBot:
         logger.info(f"Sending text to Telegram (converted to HTML): {formatted_content}")
         try:
             await self.bot.send_message(
-                chat_id=self.config['telegram_chat_id'],
+                chat_id=self.config['telegram']['chat_id'],
                 text=formatted_content,
                 parse_mode=telegram.constants.ParseMode.HTML
             )
@@ -97,14 +97,14 @@ class TelegramBot:
                 logger.info(f"Sending {file_type} to Telegram: {file_name}")
                 if file_type == 'photo':
                     await self.bot.send_photo(
-                        chat_id=self.config['telegram_chat_id'],
+                        chat_id=self.config['telegram']['chat_id'],
                         photo=file_data,
                         caption=formatted_caption,
                         parse_mode=telegram.constants.ParseMode.HTML
                     )
                 elif file_type == 'video':
                     await self.bot.send_video(
-                        chat_id=self.config['telegram_chat_id'],
+                        chat_id=self.config['telegram']['chat_id'],
                         video=file_data,
                         filename=file_name,
                         caption=formatted_caption,
@@ -112,7 +112,7 @@ class TelegramBot:
                     )
                 else:  # document
                     await self.bot.send_document(
-                        chat_id=self.config['telegram_chat_id'],
+                        chat_id=self.config['telegram']['chat_id'],
                         document=file_data,
                         filename=file_name,
                         caption=formatted_caption,

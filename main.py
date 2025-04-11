@@ -56,6 +56,7 @@ async def save_queue():
         await asyncio.sleep(60)  # Save every minute
 
 async def clean_old_logs():
+    """Delete log files older than 2 days."""
     while True:
         now = time.time()
         if os.path.exists(log_dir):
@@ -69,6 +70,7 @@ async def clean_old_logs():
         await asyncio.sleep(24 * 60 * 60)
 
 async def main():
+    """Run the Discord and Telegram bots."""
     discord_bot = DiscordBot(config, message_queue)
     telegram_bot = TelegramBot(config, message_queue)
     await load_queue()  # Load queue on startup
