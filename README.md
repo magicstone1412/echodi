@@ -27,10 +27,14 @@ A bot forward messages from discord channels to a Telegram group
 
 ```json
 {
-    "discord_token": "your_discord_bot_token",
-    "telegram_token": "your_telegram_bot_token",
-    "telegram_chat_id": "your_telegram_channel_id",
-    "discord_channel_id": 123456789012345678
+  "discord": {
+    "token": "your_discord_bot_token",
+    "channel_ids": [123456789012345678, <integer>, ...]
+  },
+  "telegram": {
+    "token": "your_telegram_bot_token",
+    "chat_id": "your_telegram_channel_id"
+  }
 }
 ```
 
