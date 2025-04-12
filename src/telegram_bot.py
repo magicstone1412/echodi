@@ -24,20 +24,23 @@ class TelegramBot:
         """Remove Discord custom emojis from the message."""
         return re.sub(r'<a?:\w+:\d+>', '', message)
 
-    def _convert_markdown_to_html(self, message):
+    def _convert_markdown_to_html ( self, message ):
         """Convert Discord Markdown to Telegram HTML."""
-        message = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', message)              # Bold
-        message = re.sub(r'__(.*?)__', r'<i>\1</i>', message)                  # Italic
-        message = re.sub(r'~~(.*?)~~', r'<s>\1</s>', message)                  # Strikethrough
-        message = re.sub(r'\|\|(.*?)\|\|', r'<span class="tg-spoiler">\1</span>', message)  # Spoiler
-        message = re.sub(r'`([^`]+)`', r'<code>\1</code>', message)            # Inline code
-        message = re.sub(
+        # Replace <placeholder> patterns with [placeholder] to avoid HTML parsing issues
+        message = re.sub ( r'<(\w+\s+[^>]+)>', r'[\1]', message )
+        message = re.sub ( r'\*\*(.*?)\*\*', r'<b>\1</b>', message )  # Bold
+        message = re.sub ( r'__(.*?)__', r'<i>\1</i>', message )  # Italic
+        message = re.sub ( r'~~(.*?)~~', r'<s>\1</s>', message )  # Strikethrough
+        message = re.sub ( r'\|\|(.*?)\|\|', r'<span class="tg-spoiler">\1</span>', message )  # Spoiler
+        message = re.sub ( r'`([^`]+)`', r'<code>\1</code>', message )  # Inline code
+        message = re.sub (
             r'```(\w+)?\n(.*?)\n```',
-            lambda m: f'<pre><code class="language-{m.group(1)}">{m.group(2)}</code></pre>' if m.group(1) else f'<pre>{m.group(2)}</pre>',
+            lambda m: f'<pre><code class="language-{m.group ( 1 )}">{m.group ( 2 )}</code></pre>' if m.group (
+                1 ) else f'<pre>{m.group ( 2 )}</pre>',
             message,
             flags=re.DOTALL
         )
-        return message.strip()
+        return message.strip ()
 
     def format_discord_message(self, content):
         """Convert Discord Markdown to Telegram HTML with newline after first colon."""
