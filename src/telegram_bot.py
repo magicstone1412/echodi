@@ -24,40 +24,61 @@ class TelegramBot:
         """Remove Discord custom emojis from the message."""
         return re.sub(r'<a?:\w+:\d+>', '', message)
 
-    def _convert_markdown_to_html ( self, message ):
-        """Convert Discord Markdown to Telegram HTML."""
-        # Replace <placeholder> patterns with [placeholder] to avoid HTML parsing issues
-        message = re.sub ( r'<(\w+\s+[^>]+)>', r'[\1]', message )
-        message = re.sub ( r'\*\*(.*?)\*\*', r'<b>\1</b>', message )  # Bold
-        message = re.sub ( r'__(.*?)__', r'<i>\1</i>', message )  # Italic
-        message = re.sub ( r'~~(.*?)~~', r'<s>\1</s>', message )  # Strikethrough
-        message = re.sub ( r'\|\|(.*?)\|\|', r'<span class="tg-spoiler">\1</span>', message )  # Spoiler
-        message = re.sub ( r'`([^`]+)`', r'<code>\1</code>', message )  # Inline code
-        message = re.sub (
-            r'```(\w+)?\n(.*?)\n```',
-            lambda m: f'<pre><code class="language-{m.group ( 1 )}">{m.group ( 2 )}</code></pre>' if m.group (
-                1 ) else f'<pre>{m.group ( 2 )}</pre>',
+    def _discord_markdown_to_telegram_markdownv2(self, message):
+        """Convert Discord Markdown to Telegram MarkdownV2."""
+        # Escape Telegram MarkdownV2 special characters
+        special_chars = r'_*[]()~`>#+-=|{}.!'
+        for char in special_chars:
+            message = message.replace(char, f'\\{char}')
+
+        # Replace <placeholder> patterns with [placeholder]
+        message = re.sub(r'\\<([A-Za-z][^>]+)\\>', r'[\1]', message)
+
+        # Convert Discord Markdown to Telegram MarkdownV2
+        # Bold: **text** -> *text*
+        message = re.sub(r'\\\*\\\*(.*?)\\\*\\\*', r'*\1*', message)
+        # Italic: *text* -> _text_ (new rule for single asterisks)
+        message = re.sub(r'\\\*([^\*].*?[^\\\*])\\\*', r'_\1_', message)
+        # Italic: __text__ -> _text_
+        message = re.sub(r'\\\_\\\_([^_]+)\\\_\\\_', r'_\1_', message)
+        # Strikethrough: ~~text~~ -> ~text~
+        message = re.sub(r'\\~\\~(.*?)\\~\\~', r'~\1~', message)
+        # Spoiler: ||text|| -> ||text||
+        message = re.sub(r'\\\|\\\|(.*?)\\\|\\\|', r'||\1||', message)
+        # Inline code: `text` -> `text`
+        message = re.sub(r'\\`([^`]+)\\`', r'`\1`', message)
+        # Code block: ```lang\ncode\n``` or ```code```
+        message = re.sub(
+            r'\\`\\`\\`(\w+)?\n(.*?)\n\\`\\`\\`',
+            lambda m: f'```{m.group(1) or ""}\n{m.group(2)}\n```',
             message,
             flags=re.DOTALL
         )
-        return message.strip ()
+
+        return message.strip()
 
     def format_discord_message(self, content):
-        """Convert Discord Markdown to Telegram HTML with newline after first colon."""
+        """Convert Discord Markdown to Telegram MarkdownV2 with newline after first colon."""
         prefix, message = self._split_message_by_colon(content)
         message = self._remove_discord_emojis(message)
-        message = self._convert_markdown_to_html(message)
-        return f"{prefix}:\n{message}" if prefix else message
+        message = self._discord_markdown_to_telegram_markdownv2(message)
+        if prefix:
+            # Escape special characters in prefix for Telegram MarkdownV2
+            special_chars = r'_*[]()~`>#+-=|{}.!'
+            for char in special_chars:
+                prefix = prefix.replace(char, f'\\{char}')
+            return f"{prefix}:\n{message}"
+        return message
 
     async def send_text_message(self, content):
-        """Send a text message to Telegram with HTML parsing."""
+        """Send a text message to Telegram with MarkdownV2 parsing."""
         formatted_content = self.format_discord_message(content)
-        logger.info(f"Sending text to Telegram (converted to HTML): {formatted_content}")
+        logger.info(f"Sending text to Telegram (converted to MarkdownV2): {formatted_content}")
         try:
             await self.bot.send_message(
                 chat_id=self.config['telegram']['chat_id'],
                 text=formatted_content,
-                parse_mode=telegram.constants.ParseMode.HTML
+                parse_mode=telegram.constants.ParseMode.MARKDOWN_V2
             )
             logger.info("Text message sent successfully")
         except telegram.error.TelegramError as e:
@@ -76,7 +97,9 @@ class TelegramBot:
     async def _send_large_file_fallback(self, formatted_caption, url, file_type):
         """Send a fallback text message with a link for large files."""
         logger.info(f"{file_type.capitalize()} too large, sending caption and hidden URL")
-        await self.send_text_message(f"{formatted_caption}\n{file_type.capitalize()}: <a href=\"{url}\">Link</a>")
+        # Escape special characters in URL for MarkdownV2
+        url = ''.join(f'\\{c}' if c in r'_*[]()~`>#+-=|{}.!' else c for c in url)
+        await self.send_text_message(f"{formatted_caption}\n{file_type.capitalize()}: [{file_type.capitalize()}]({url})")
 
     async def send_attachment(self, url, caption, session):
         """Send an attachment (photo, video, or document) to Telegram."""
@@ -103,7 +126,7 @@ class TelegramBot:
                         chat_id=self.config['telegram']['chat_id'],
                         photo=file_data,
                         caption=formatted_caption,
-                        parse_mode=telegram.constants.ParseMode.HTML
+                        parse_mode=telegram.constants.ParseMode.MARKDOWN_V2
                     )
                 elif file_type == 'video':
                     await self.bot.send_video(
@@ -111,7 +134,7 @@ class TelegramBot:
                         video=file_data,
                         filename=file_name,
                         caption=formatted_caption,
-                        parse_mode=telegram.constants.ParseMode.HTML
+                        parse_mode=telegram.constants.ParseMode.MARKDOWN_V2
                     )
                 else:  # document
                     await self.bot.send_document(
@@ -119,7 +142,7 @@ class TelegramBot:
                         document=file_data,
                         filename=file_name,
                         caption=formatted_caption,
-                        parse_mode=telegram.constants.ParseMode.HTML
+                        parse_mode=telegram.constants.ParseMode.MARKDOWN_V2
                     )
                 logger.info("Attachment sent successfully")
             except telegram.error.TelegramError as e:
